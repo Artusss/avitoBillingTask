@@ -1,4 +1,3 @@
 <?php
-$router->get('/', function () use ($router) {
-    return $router->app->version();
-});
+$router->get('/payment', "PaymentServiceController@payment");
+$router->get('/', "PaymentServiceController@index");
