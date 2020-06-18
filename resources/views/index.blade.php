@@ -10,11 +10,17 @@
                         <font color="blue">GET</font> : <b>"/"</b> - документация по данному API.
                     </li>
                     <li>
-                        <font color="blue">GET</font> : <b>"/register?nominal={nominal}&slug={slug}"</b> - 
-                        принимает сумму и назначение платежа 
+                        <font color="blue">GET</font> : <b>"/register?nominal={nominal}&slug={slug}&callbackUrl={callbackUrl}"</b> - 
+                        принимает сумму, назначение платежа и url для обратной связи 
                         и возвращает URL страницы с идентификатором платёжной сессии 
                         (/payments/card/form?sessionId={sessionId}), 
-                        а также сумму и назначение платежа.
+                        а также сумму, назначение платежа и url для обратной связи в формате json.
+                    </li>
+                    <li>
+                        <font color="blue">GET</font> : <b>"/payments?dateFrom={dateFrom}&dateTo={dateTo}"</b> - 
+                        принимает временной интервал 
+                        и возвращает список всех платежей за данный период в фомате json.
+                        Если интервал не будет указан или будет указан частично выборка также сработает.
                     </li>
                     <li>
                         <font color="blue">GET</font> : <b>"/payments/card/form?sessionId={sessionId}"</b> - 

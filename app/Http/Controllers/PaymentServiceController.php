@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Validator;
+use App\Payment;
 
 class PaymentServiceController extends Controller
 {
@@ -23,20 +24,32 @@ class PaymentServiceController extends Controller
         else
         {
             session_start();
-            $sessionId                    = session_id();
-            
-            $redirectUrl                    = $_SERVER["SERVER_NAME"] . "/payments/card/form?sessionId={$sessionId}";
+            $payment = new Payment;
+
+            $_SESSION["id"]                 = session_id();
+            $payment->sessionId             = $_SESSION["id"];
+            $redirectUrl                    = $_SERVER["SERVER_NAME"] . "/payments/card/form?sessionId={$_SESSION["id"]}";
 
             $responseArray["status"]        = 200;
             $responseArray["success"]       = true;
 
             $responseArray["nominal"]       = $_GET["nominal"];
+            $payment->nominal               = $_GET["nominal"];
             $_SESSION["payment"]["nominal"] = $_GET["nominal"];
             
             $responseArray["slug"]          = $_GET["slug"];
+            $payment->slug                  = $_GET["slug"];
             $_SESSION["payment"]["slug"]    = $_GET["slug"];
 
+            if(!empty($_GET["callbackUrl"]))
+            {
+                $callbackUrl = $_GET["callbackUrl"];
+                $responseArray["callbackUrl"]       = $callbackUrl;
+                $_SESSION["payment"]["callbackUrl"] = $callbackUrl;
+            }
             $responseArray["redirectUrl"]   = $redirectUrl;
+            
+            $payment->save();
         }
 
         return response()
@@ -48,6 +61,45 @@ class PaymentServiceController extends Controller
         return view("index");
     }
 
+    public function payments()
+    {
+        $responseArray = array(
+            "status"  => 200,
+            "success" => true
+        );
+        if(!empty($_GET["dateFrom"]) && !empty($_GET["dateTo"]))
+        {
+            $dateFrom = $_GET["dateFrom"];
+            $dateTo   = $_GET["dateTo"];
+            $payments = Payment::whereBetween("created_at", array($dateFrom, $dateTo))
+                ->get();
+        }
+        elseif(empty($_GET["dateFrom"]) && empty($_GET["dateTo"]))
+        {
+            $payments = Payment::all();
+        }
+        else
+        {
+            if(empty($_GET["dateFrom"]))
+            {
+                $dateTo   = $_GET["dateTo"];
+                $payments = Payment::where("created_at", "<=", $dateTo)
+                    ->get();
+            }
+            else
+            {
+                $dateFrom = $_GET["dateFrom"];
+                $payments = Payment::where("created_at", ">=", $dateFrom)
+                    ->get();
+            }
+        }
+
+        $responseArray["payments"] = $payments->toArray();
+        return response()
+            ->json($responseArray)
+            ->header("ContentType", "application/json");
+    }
+
     public function paymentsCardForm()
     {
         session_start();
@@ -57,13 +109,21 @@ class PaymentServiceController extends Controller
                 "message" => "Не удалось обнаружить параметр 'sessionId'"
             ));
         }
+        if(!isset($_SESSION["id"]))
+        {
+            return view("status", array(
+                "message" => "Платежной сессии не существует"
+            ));
+        }
         $requestSessionId = $_GET["sessionId"];
-        $currentSessionId = session_id();
+        $currentSessionId = $_SESSION["id"];
         if(strcmp($requestSessionId, $currentSessionId) === 0)
         {
             return view("payments/card/form", array(
-                "nominal" => $_SESSION["payment"]["nominal"],
-                "slug"    => $_SESSION["payment"]["slug"]
+                "nominal"     => $_SESSION["payment"]["nominal"],
+                "slug"        => $_SESSION["payment"]["slug"],
+                "callbackUrl" => !empty($_SESSION["payment"]["callbackUrl"]) ? $_SESSION["payment"]["callbackUrl"] : "",
+                "sessionId"   => $requestSessionId
             ));
         }
         return view("status", array(
@@ -83,6 +143,7 @@ class PaymentServiceController extends Controller
                 "message" => "Некорректная карта, оплата недействительна"
             ));
         }
+        session_destroy();
         return view("status", array(
             "message" => "Поздравляем, оплата прошла успешно"
         ));
