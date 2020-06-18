@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
+use Validator;
+
 class PaymentServiceController extends Controller
 {
     public function register()
     {
         $responseArray = array(
-            "status" => 400
+            "status" => 400,
+            "success" => false
         );
         if(empty($_GET["nominal"]))
         {
@@ -25,6 +28,7 @@ class PaymentServiceController extends Controller
             $redirectUrl                    = $_SERVER["SERVER_NAME"] . "/payments/card/form?sessionId={$sessionId}";
 
             $responseArray["status"]        = 200;
+            $responseArray["success"]       = true;
 
             $responseArray["nominal"]       = $_GET["nominal"];
             $_SESSION["payment"]["nominal"] = $_GET["nominal"];
@@ -41,12 +45,7 @@ class PaymentServiceController extends Controller
     }
 
     public function index(){
-        $responseArray = array(
-            "info" => "About this API!"
-        );
-        return response()
-            ->json($responseArray)
-            ->header("ContentType", "application/json");
+        return view("index");
     }
 
     public function paymentsCardForm()
@@ -54,8 +53,9 @@ class PaymentServiceController extends Controller
         session_start();
         if(empty($_GET["sessionId"]))
         {
-            echo "Wwedi parametr";
-            return;
+            return view("status", array(
+                "message" => "Не удалось обнаружить параметр 'sessionId'"
+            ));
         }
         $requestSessionId = $_GET["sessionId"];
         $currentSessionId = session_id();
@@ -66,12 +66,43 @@ class PaymentServiceController extends Controller
                 "slug"    => $_SESSION["payment"]["slug"]
             ));
         }
-        echo "tut ne budet formi";
-        return;
+        return view("status", array(
+            "message" => "Данный 'sessionId' не совпадает с текущим"
+        ));
     }
 
     public function paymentsCardFormPay(Request $request)
     {
-        return "OK";
+        session_start();
+        $validator = Validator::make($request->all(), [
+            'card' => 'required|max:16'
+        ]);
+        $isLunaCard = $this->isLunaCard($request->card);
+        if ($validator->fails() || !$isLunaCard) {
+            return view("status", array(
+                "message" => "Некорректная карта, оплата недействительна"
+            ));
+        }
+        return view("status", array(
+            "message" => "Поздравляем, оплата прошла успешно"
+        ));
+    }
+
+    private function isLunaCard($value)
+    {
+        $number = strrev(preg_replace('/[^\d]+/', '', $value));
+        $sum = 0;
+        for ($i = 0, $j = strlen($number); $i < $j; $i++) {
+            if (($i % 2) == 0) {
+                $val = $number[$i];
+            } else {
+                $val = $number[$i] * 2;
+                if ($val > 9)  {
+                    $val -= 9;
+                }
+            }
+            $sum += $val;
+        }
+        return (($sum % 10) === 0);
     }
 }
